@@ -1,0 +1,6 @@
+{
+  "name": "EmergencyGo",
+  "description": "Production-grade emergency transport and hospital routing system. Help is closer than you think.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
