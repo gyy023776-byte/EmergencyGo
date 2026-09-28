@@ -1763,11 +1763,33 @@ app.post('/api/config/keys', (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
-// OWNER AUTHENTICATION & ACCESS CONTROL
+// OWNER AUTHENTICATION & ACCESS CONTROL (No hardcoded default password)
 // ---------------------------------------------------------
-let currentOwnerPassword = process.env.OWNER_PASSWORD || 'owner@2026';
+let currentOwnerPassword = process.env.OWNER_PASSWORD || '';
 let failedOwnerAttempts = 0;
 let ownerLockoutUntil = 0;
+
+// Setup First-Time Owner Password (Used when no password has been configured yet)
+app.post('/api/owner/setup-password', (req: Request, res: Response) => {
+  if (currentOwnerPassword) {
+    return res.status(400).json({ error: 'Owner password has already been set. Use change password instead.' });
+  }
+
+  const { new_password } = req.body;
+  if (!new_password || typeof new_password !== 'string' || new_password.trim().length < 4) {
+    return res.status(400).json({ error: 'Owner password must be at least 4 characters long.' });
+  }
+
+  currentOwnerPassword = new_password.trim();
+  failedOwnerAttempts = 0;
+  const token = `owner_tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  console.log(`[Security] Secret owner password initialized by administrator.`);
+  res.json({
+    success: true,
+    message: 'Owner password configured successfully! Full administrative control granted.',
+    token,
+  });
+});
 
 // Verify Owner Password
 app.post('/api/owner/verify', (req: Request, res: Response) => {
@@ -1781,9 +1803,17 @@ app.post('/api/owner/verify', (req: Request, res: Response) => {
     });
   }
 
+  // If no password has been initialized yet, instruct setup
+  if (!currentOwnerPassword) {
+    return res.status(400).json({
+      needs_setup: true,
+      error: 'No owner password has been configured yet. Please create your secret owner password.',
+    });
+  }
+
   const { password } = req.body;
   if (!password) {
-    return res.status(400).json({ error: 'Owner password is required' });
+    return res.status(400).json({ error: 'Owner password is required.' });
   }
 
   if (password === currentOwnerPassword) {
@@ -1815,19 +1845,15 @@ app.post('/api/owner/verify', (req: Request, res: Response) => {
 // Change Owner Password (Requires current password verification)
 app.post('/api/owner/change-password', (req: Request, res: Response) => {
   const { current_password, new_password } = req.body;
-  if (!current_password || !new_password) {
-    return res.status(400).json({ error: 'Both current password and new password are required' });
+  if (!new_password || typeof new_password !== 'string' || new_password.trim().length < 4) {
+    return res.status(400).json({ error: 'New owner password must be at least 4 characters long.' });
   }
 
-  if (current_password !== currentOwnerPassword) {
+  if (currentOwnerPassword && current_password !== currentOwnerPassword) {
     return res.status(401).json({ error: 'Current owner password is incorrect. Access denied.' });
   }
 
-  if (new_password.length < 4) {
-    return res.status(400).json({ error: 'New owner password must be at least 4 characters long' });
-  }
-
-  currentOwnerPassword = new_password;
+  currentOwnerPassword = new_password.trim();
   console.log(`[Security] Owner password updated successfully by verified owner.`);
   res.json({
     success: true,
@@ -1839,7 +1865,10 @@ app.post('/api/owner/change-password', (req: Request, res: Response) => {
 app.get('/api/owner/status', (_req: Request, res: Response) => {
   res.json({
     protected: true,
-    message: 'Owner access requires valid password authentication.',
+    has_password: Boolean(currentOwnerPassword),
+    message: currentOwnerPassword 
+      ? 'Owner access requires valid password authentication.' 
+      : 'First-time setup required: No owner password configured yet.',
   });
 });
 
