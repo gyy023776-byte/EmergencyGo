@@ -112,28 +112,28 @@ export const ActiveDispatchBanner: React.FC<ActiveDispatchBannerProps> = ({
   };
 
   return (
-    <div className={`rounded-xl p-4 space-y-3 transition-colors border ${
+    <div className={`rounded-2xl p-5 space-y-4 transition-all border shadow-xl ${
       isDark 
-        ? 'bg-[#0f172a] border-red-500/80 text-white shadow-lg' 
-        : 'bg-white border-red-200 text-slate-800 shadow-md ring-1 ring-red-500/10'
+        ? 'bg-gradient-to-br from-[#1c0c16] via-[#0f172a] to-[#070b14] border-rose-600/80 text-white emergency-glow' 
+        : 'bg-gradient-to-br from-rose-50/90 via-white to-red-50/50 border-red-300 text-slate-800 shadow-rose-500/10 ring-2 ring-red-500/20'
     }`}>
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-red-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-            <Siren className="w-4 h-4 animate-pulse" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-red-600/30">
+            <Siren className="w-5 h-5 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-xs text-red-600 dark:text-red-400">
-                DISPATCH #{dispatch.id.toUpperCase()}
+              <span className="font-mono font-black text-xs text-rose-600 dark:text-rose-400">
+                CAD DISPATCH #{dispatch.id.toUpperCase()}
               </span>
               <span className="text-slate-300 dark:text-slate-600 select-none">·</span>
-              <span className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+              <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {dispatch.emergency_category}
               </span>
             </div>
-            <div className={`text-sm font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`text-base font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {getStatusText()}
             </div>
           </div>
