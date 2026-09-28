@@ -82,6 +82,32 @@ let hospitalsDb: any[] = [];
 let ambulancesDb: any[] = [];
 let dispatchesDb: any[] = [];
 let usersDb: any[] = [];
+let feedbackDb: any[] = [
+  {
+    id: 'fb-demo-1',
+    user_name: 'Dr. Anand Varma',
+    user_phone: '+91 98480 11223',
+    role: 'patient',
+    category: 'ambulance_speed',
+    rating: 5,
+    tags: ['⚡ Rapid Dispatch', '🏥 Accurate ICU Beds', '🚑 Lifesaving Service'],
+    comments: 'Ambulance AP 39 TE 1080 arrived in 4 minutes flat with active paramedic telemetry. King George Hospital ICU bed reservation was confirmed en route. Outstanding service!',
+    city: 'Visakhapatnam',
+    created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+  },
+  {
+    id: 'fb-demo-2',
+    user_name: 'Pooja Reddy',
+    user_phone: '+91 94401 55667',
+    role: 'patient',
+    category: 'hospital_accuracy',
+    rating: 5,
+    tags: ['🏥 Accurate ICU Beds', '🧭 Precise Road Directions'],
+    comments: 'Very accurate ICU ventilator availability and spatial routing. We did not waste precious minutes traveling to hospitals with diversion status.',
+    city: 'Visakhapatnam',
+    created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
+  }
+];
 let lastOsmSyncTime: string | null = null;
 
 // Initial Pre-seeded Real Hospitals (Verified Coordinates, Real Phone Numbers & Capacities)
@@ -1736,6 +1762,87 @@ app.post('/api/config/keys', (req: Request, res: Response) => {
   });
 });
 
+// ---------------------------------------------------------
+// OWNER AUTHENTICATION & ACCESS CONTROL
+// ---------------------------------------------------------
+let currentOwnerPassword = process.env.OWNER_PASSWORD || 'owner@2026';
+let failedOwnerAttempts = 0;
+let ownerLockoutUntil = 0;
+
+// Verify Owner Password
+app.post('/api/owner/verify', (req: Request, res: Response) => {
+  const now = Date.now();
+  if (now < ownerLockoutUntil) {
+    const waitSecs = Math.ceil((ownerLockoutUntil - now) / 1000);
+    return res.status(429).json({
+      error: `Too many failed attempts. Owner portal temporarily locked for security. Please wait ${waitSecs}s.`,
+      lockout: true,
+      wait_seconds: waitSecs,
+    });
+  }
+
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ error: 'Owner password is required' });
+  }
+
+  if (password === currentOwnerPassword) {
+    failedOwnerAttempts = 0;
+    const token = `owner_tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return res.json({
+      success: true,
+      message: 'Owner credentials verified successfully. Full administrative control granted.',
+      token,
+    });
+  } else {
+    failedOwnerAttempts += 1;
+    if (failedOwnerAttempts >= 5) {
+      ownerLockoutUntil = now + 60 * 1000;
+      return res.status(429).json({
+        error: 'Too many incorrect attempts! Owner access locked for 60 seconds.',
+        lockout: true,
+        wait_seconds: 60,
+      });
+    }
+    const remainingAttempts = 5 - failedOwnerAttempts;
+    return res.status(401).json({
+      error: `Incorrect owner password! Access denied. ${remainingAttempts} attempt(s) remaining.`,
+      attempts_remaining: remainingAttempts,
+    });
+  }
+});
+
+// Change Owner Password (Requires current password verification)
+app.post('/api/owner/change-password', (req: Request, res: Response) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'Both current password and new password are required' });
+  }
+
+  if (current_password !== currentOwnerPassword) {
+    return res.status(401).json({ error: 'Current owner password is incorrect. Access denied.' });
+  }
+
+  if (new_password.length < 4) {
+    return res.status(400).json({ error: 'New owner password must be at least 4 characters long' });
+  }
+
+  currentOwnerPassword = new_password;
+  console.log(`[Security] Owner password updated successfully by verified owner.`);
+  res.json({
+    success: true,
+    message: 'Owner password has been successfully updated! Keep your new password secure.',
+  });
+});
+
+// Check Owner Status
+app.get('/api/owner/status', (_req: Request, res: Response) => {
+  res.json({
+    protected: true,
+    message: 'Owner access requires valid password authentication.',
+  });
+});
+
 // 2. Dynamic Database-Driven Hospital Discovery
 // Executes the exact PostGIS query specified in prompt
 app.get('/api/hospitals', async (req: Request, res: Response) => {
@@ -2560,6 +2667,44 @@ app.post('/api/dispatches/:id/cancel', (req: Request, res: Response) => {
   }
 
   res.json({ success: true, message: 'Dispatch cancelled', dispatch });
+});
+
+// ---------------------------------------------------------
+// 6.5. User Feedback & EMS Community Reviews
+// ---------------------------------------------------------
+app.get('/api/feedback', (req: Request, res: Response) => {
+  res.json({ success: true, feedbacks: feedbackDb });
+});
+
+app.post('/api/feedback', (req: Request, res: Response) => {
+  try {
+    const { user_name, user_phone, user_email, role, category, rating, tags, comments, city } = req.body;
+    
+    if (!comments || typeof comments !== 'string' || !comments.trim()) {
+      return res.status(400).json({ success: false, error: 'Feedback comments are required' });
+    }
+
+    const newFeedback = {
+      id: `fb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_name: user_name ? String(user_name).trim() : 'Citizen User',
+      user_phone: user_phone ? String(user_phone).trim() : '',
+      user_email: user_email ? String(user_email).trim() : '',
+      role: role || 'patient',
+      category: category || 'general',
+      rating: typeof rating === 'number' && rating >= 1 && rating <= 5 ? rating : 5,
+      tags: Array.isArray(tags) ? tags : [],
+      comments: String(comments).trim(),
+      city: city || currentCity,
+      created_at: new Date().toISOString(),
+    };
+
+    feedbackDb.unshift(newFeedback);
+    console.log(`[Feedback] Received new feedback from ${newFeedback.user_name} (${newFeedback.rating} stars)`);
+    res.json({ success: true, feedback: newFeedback });
+  } catch (err: any) {
+    console.error('[Feedback] Submission error:', err);
+    res.status(500).json({ success: false, error: 'Failed to record feedback' });
+  }
 });
 
 // ---------------------------------------------------------

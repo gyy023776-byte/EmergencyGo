@@ -144,3 +144,18 @@ export interface SystemConfig {
   total_ambulances: number;
   active_dispatches: number;
 }
+
+export interface UserFeedback {
+  id: string;
+  user_name: string;
+  user_phone?: string;
+  user_email?: string;
+  role?: string;
+  category: 'ambulance_speed' | 'hospital_accuracy' | 'paramedic_care' | 'app_maps' | 'suggestion_bug' | 'general';
+  rating: number; // 1 to 5
+  tags: string[];
+  comments: string;
+  city?: string;
+  created_at: string;
+}
+

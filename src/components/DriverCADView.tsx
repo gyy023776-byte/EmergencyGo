@@ -4,6 +4,7 @@ import {
   Heart, Activity, CheckCircle, Radio, Phone, User, AlertCircle, Check
 } from 'lucide-react';
 import { Ambulance, Dispatch, Hospital } from '../types.ts';
+import { AmbulanceLogo } from './AmbulanceLogo.tsx';
 
 interface DriverCADViewProps {
   ambulance: Ambulance;
@@ -65,30 +66,35 @@ export const DriverCADView: React.FC<DriverCADViewProps> = ({
   return (
     <div className="space-y-4">
       {/* Unit Status Tactical Bar */}
-      <div className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 transition-colors ${
-        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+      <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all shadow-sm ${
+        isDark ? 'bg-[#0b101c] border-slate-800' : 'bg-white border-slate-200'
       }`}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
-            <Siren className="w-5 h-5" />
-          </div>
+        <div className="flex items-center gap-3.5">
+          <AmbulanceLogo size="lg" variant="emblem" animateLights={true} />
           <div>
             <div className="flex items-center gap-2">
-              <h2 className={`text-base font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h2 className={`text-lg font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {ambulance.call_sign}
               </h2>
               <span className="text-slate-400 text-xs">·</span>
-              <span className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">
+              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                 {ambulance.vehicle_type}
               </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                EMS Unit Active
+              </span>
             </div>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Paramedic: <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>{ambulance.driver_name}</strong> · Reg: {ambulance.vehicle_number}
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Lead Paramedic: <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>{ambulance.driver_name}</strong> · Plate: <span className="font-mono">{ambulance.vehicle_number}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs font-mono">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden md:block">
+            <AmbulanceLogo size="md" variant="vehicle" animateLights={true} />
+          </div>
           <div className={`px-3 py-1.5 rounded-lg border text-center ${
             isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
           }`}>

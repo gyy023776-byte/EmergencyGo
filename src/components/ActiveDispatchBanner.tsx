@@ -4,6 +4,7 @@ import {
   Phone, Building2, CheckCircle2, ShieldAlert, X, AlertOctagon, RotateCcw
 } from 'lucide-react';
 import { Dispatch, Ambulance } from '../types.ts';
+import { AmbulanceLogo } from './AmbulanceLogo.tsx';
 
 interface ActiveDispatchBannerProps {
   dispatch: Dispatch;
@@ -112,28 +113,26 @@ export const ActiveDispatchBanner: React.FC<ActiveDispatchBannerProps> = ({
   };
 
   return (
-    <div className={`rounded-2xl p-5 space-y-4 transition-all border shadow-xl ${
+    <div className={`rounded-xl p-4 space-y-3 transition-colors border ${
       isDark 
-        ? 'bg-gradient-to-br from-[#1c0c16] via-[#0f172a] to-[#070b14] border-rose-600/80 text-white emergency-glow' 
-        : 'bg-gradient-to-br from-rose-50/90 via-white to-red-50/50 border-red-300 text-slate-800 shadow-rose-500/10 ring-2 ring-red-500/20'
+        ? 'bg-[#0f172a] border-red-500/80 text-white shadow-lg' 
+        : 'bg-white border-red-200 text-slate-800 shadow-md ring-1 ring-red-500/10'
     }`}>
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-red-600/30">
-            <Siren className="w-5 h-5 animate-pulse" />
-          </div>
+          <AmbulanceLogo size="md" variant="emblem" animateLights={true} />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-black text-xs text-rose-600 dark:text-rose-400">
-                CAD DISPATCH #{dispatch.id.toUpperCase()}
+              <span className="font-mono font-bold text-xs text-red-600 dark:text-red-400">
+                DISPATCH #{dispatch.id.toUpperCase()}
               </span>
               <span className="text-slate-300 dark:text-slate-600 select-none">·</span>
-              <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+              <span className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {dispatch.emergency_category}
               </span>
             </div>
-            <div className={`text-base font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`text-sm font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {getStatusText()}
             </div>
           </div>
@@ -218,18 +217,21 @@ export const ActiveDispatchBanner: React.FC<ActiveDispatchBannerProps> = ({
       {/* Grid: Unit + Hospital + Live Vitals */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1 text-xs">
         {/* Unit Info */}
-        <div className={`p-3 rounded-lg border ${
+        <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
           isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50/70 border-slate-200'
         }`}>
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1 font-semibold">Assigned Unit</span>
-          <div className="font-bold text-xs flex items-center gap-2">
-            <span className={isDark ? 'text-white' : 'text-slate-900'}>{amb?.call_sign || 'ALS Unit 101'}</span>
-            <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-semibold">({amb?.vehicle_type || 'ALS'})</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-0.5 font-semibold">Assigned EMS Unit</span>
+            <div className="font-bold text-xs flex items-center gap-2">
+              <span className={isDark ? 'text-white' : 'text-slate-900'}>{amb?.call_sign || 'ALS Unit 101'}</span>
+              <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">({amb?.vehicle_type || 'ALS'})</span>
+            </div>
+            <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              Paramedic: <strong>{amb?.driver_name}</strong>
+            </div>
+            <div className="text-[10px] font-mono text-slate-500 mt-0.5">{amb?.driver_phone}</div>
           </div>
-          <div className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Paramedic: {amb?.driver_name}
-          </div>
-          <div className="text-[11px] font-mono text-slate-500 mt-0.5">{amb?.driver_phone}</div>
+          <AmbulanceLogo size="md" variant="vehicle" animateLights={true} className="shrink-0" />
         </div>
 
         {/* Hospital Info */}

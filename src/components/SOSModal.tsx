@@ -4,6 +4,7 @@ import {
   CheckCircle2, HeartPulse, Building2, Flame, X, Navigation
 } from 'lucide-react';
 import { Hospital, Ambulance, EmergencyCategory, EmergencyPriority } from '../types.ts';
+import { AmbulanceLogo } from './AmbulanceLogo.tsx';
 
 interface SOSModalProps {
   isOpen: boolean;
@@ -199,13 +200,11 @@ export const SOSModal: React.FC<SOSModalProps> = ({
           </div>
 
           {/* 3. Dispatch Vehicle Status */}
-          <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
-            isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+          <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+            isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-xs'
           }`}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                <Siren className="w-4 h-4" />
-              </div>
+              <AmbulanceLogo size="md" variant="emblem" animateLights={true} className="shrink-0" />
               <div>
                 <div className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {availableAmbulances.length > 0 ? 'Nearest Available ALS Ambulance Unit' : 'Backup EMS Unit Routing'}
@@ -217,9 +216,14 @@ export const SOSModal: React.FC<SOSModalProps> = ({
                 </div>
               </div>
             </div>
-            <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-              GPS Verified
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden sm:block">
+                <AmbulanceLogo size="sm" variant="vehicle" animateLights={false} />
+              </div>
+              <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                GPS Verified
+              </span>
+            </div>
           </div>
 
           {/* 4. Caller & Incident Location */}
@@ -309,9 +313,9 @@ export const SOSModal: React.FC<SOSModalProps> = ({
             type="button"
             onClick={handleTriggerDispatch}
             disabled={isSubmitting}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition-all disabled:opacity-50"
+            className="btn-3d-red px-6 py-2.5 text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-lg disabled:opacity-50 tracking-wide"
           >
-            <Siren className="w-4 h-4" />
+            <Siren className="w-4 h-4 animate-bounce" />
             <span>{isSubmitting ? 'Contacting EMS...' : 'Confirm Ambulance Dispatch'}</span>
           </button>
         </div>

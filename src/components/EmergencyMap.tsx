@@ -3,6 +3,8 @@ import L from 'leaflet';
 import { Hospital, Ambulance, Dispatch } from '../types.ts';
 import { loadGoogleMaps } from '../utils/googleMapsLoader.ts';
 import { emergencyDarkMapStyle } from '../utils/googleMapsStyles.ts';
+import { getAmbulanceMapMarkerSvg } from './AmbulanceLogo.tsx';
+import { getHospitalMapMarkerSvg } from './HospitalLogo.tsx';
 import { 
   Layers, MapPin, Navigation, Siren, Radio, Eye, 
   Car, ShieldAlert, CheckCircle, RefreshCw, ZoomIn, ZoomOut, Compass
@@ -234,18 +236,11 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
         position: { lat: hosp.latitude, lng: hosp.longitude },
         map,
         title: hosp.name,
-        zIndex: isSelected ? 90 : 50,
+        zIndex: isSelected ? 95 : 50,
         icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="44" height="48" viewBox="0 0 44 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="6" y="2" width="32" height="32" rx="8" fill="${bgColor}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))"/>
-              <text x="22" y="23" fill="#ffffff" font-family="sans-serif" font-size="14" font-weight="900" text-anchor="middle">H</text>
-              <rect x="2" y="34" width="40" height="13" rx="3" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-              <text x="22" y="44" fill="#ffffff" font-family="sans-serif" font-size="8" font-weight="700" text-anchor="middle">${labelBed}</text>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(44, 48),
-          anchor: new google.maps.Point(22, 24),
+          url: getHospitalMapMarkerSvg(hosp, isSelected),
+          scaledSize: new google.maps.Size(52, 58),
+          anchor: new google.maps.Point(26, 29),
         },
       });
 
@@ -284,16 +279,9 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
         title: `${amb.call_sign} (${amb.vehicle_type})`,
         zIndex: 80,
         icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="44" height="46" viewBox="0 0 44 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="6" y="2" width="32" height="30" rx="7" fill="#f59e0b" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))"/>
-              <text x="22" y="22" fill="#0f172a" font-family="sans-serif" font-size="14" font-weight="900" text-anchor="middle">🚑</text>
-              <rect x="2" y="32" width="40" height="13" rx="3" fill="#020617" stroke="#334155" stroke-width="1"/>
-              <text x="22" y="42" fill="#fef08a" font-family="sans-serif" font-size="8" font-weight="700" text-anchor="middle">${amb.call_sign}</text>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(44, 46),
-          anchor: new google.maps.Point(22, 23),
+          url: getAmbulanceMapMarkerSvg(amb.call_sign, isBusy),
+          scaledSize: new google.maps.Size(48, 52),
+          anchor: new google.maps.Point(24, 26),
         },
       });
 
@@ -418,34 +406,78 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
       const hospIcon = L.divIcon({
         className: 'custom-hosp-icon',
         html: `
-          <div class="relative flex items-center justify-center cursor-pointer">
-            <div class="w-8 h-8 rounded-xl ${badgeBg} border-2 border-white shadow-xl flex items-center justify-center text-white text-xs font-black">H</div>
-            <div class="absolute -bottom-4 bg-slate-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap border border-slate-700">
+          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+            <div class="absolute -top-1 w-12 h-12 rounded-full ${isSelected ? 'bg-red-500/40 animate-ping' : 'bg-emerald-500/20'}"></div>
+            <!-- Hospital Building Vector Emblem -->
+            <div class="relative w-10 h-10 rounded-xl ${badgeBg} border-2 border-white shadow-xl flex items-center justify-center p-1">
+              <svg viewBox="0 0 36 36" class="w-full h-full" fill="none">
+                <!-- Center Hospital Tower -->
+                <rect x="10" y="5" width="16" height="26" rx="2" fill="#ffffff" />
+                <!-- Left & Right Wing -->
+                <rect x="4" y="12" width="6" height="19" rx="1" fill="#f1f5f9" />
+                <rect x="26" y="12" width="6" height="19" rx="1" fill="#f1f5f9" />
+                <!-- Red Medical Cross on Tower -->
+                <circle cx="18" cy="11" r="4" fill="#ffffff" />
+                <rect x="17" y="8.5" width="2" height="5" rx="0.5" fill="#dc2626" />
+                <rect x="15.5" y="10" width="5" height="2" rx="0.5" fill="#dc2626" />
+                <!-- Hospital Windows -->
+                <rect x="12" y="17" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <rect x="16.5" y="17" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <rect x="21" y="17" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <rect x="12" y="21" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <rect x="16.5" y="21" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <rect x="21" y="21" width="2.5" height="2" rx="0.3" fill="#0284c7" />
+                <!-- ER Canopy Door -->
+                <rect x="14" y="26" width="8" height="5" rx="0.5" fill="#0f172a" />
+                <rect x="14" y="26" width="8" height="1.2" fill="#ef4444" />
+              </svg>
+            </div>
+            <!-- ICU Capacity Tag -->
+            <div class="mt-1 bg-slate-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow border border-slate-700 whitespace-nowrap">
               ${hosp.capacity.icu_available} ICU
             </div>
           </div>
         `,
-        iconSize: [36, 40],
-        iconAnchor: [18, 20],
+        iconSize: [44, 52],
+        iconAnchor: [22, 26],
       });
       const marker = L.marker([hosp.latitude, hosp.longitude], { icon: hospIcon }).addTo(markersLayer);
       marker.on('click', () => onSelectHospital(hosp));
     });
 
-    // Leaflet Ambulances
+    // Leaflet Ambulances with Custom EMS Logo Marker
     ambulances.forEach((amb) => {
       const isBusy = amb.status !== 'available';
       const ambIcon = L.divIcon({
         className: 'custom-amb-icon',
         html: `
-          <div class="relative flex items-center justify-center">
-            ${isBusy ? '<div class="absolute -inset-1 rounded-full bg-red-500/40 animate-pulse"></div>' : ''}
-            <div class="relative w-8 h-8 rounded-lg bg-amber-500 border-2 border-white shadow-xl flex items-center justify-center text-slate-950 text-xs font-black">🚑</div>
-            <div class="absolute -bottom-4 bg-slate-950 text-amber-300 text-[9px] font-bold px-1 rounded shadow whitespace-nowrap border border-slate-700">${amb.call_sign}</div>
+          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+            <div class="absolute -top-1 w-12 h-12 rounded-full ${isBusy ? 'bg-red-500/30 animate-ping' : 'bg-blue-500/20 animate-pulse'}"></div>
+            <!-- Ambulance Vector Emblem -->
+            <div class="relative w-10 h-10 rounded-xl bg-slate-900 border-2 border-white shadow-xl flex items-center justify-center p-1">
+              <svg viewBox="0 0 40 40" class="w-full h-full" fill="none">
+                <!-- Vehicle Body -->
+                <rect x="3" y="10" width="34" height="20" rx="4" fill="#ffffff" />
+                <rect x="3" y="18" width="34" height="4" fill="${isBusy ? '#dc2626' : '#d97706'}" />
+                <rect x="26" y="12" width="9" height="7" rx="1.5" fill="#38bdf8" />
+                <!-- Star of Life -->
+                <path d="M15 13 V20 M11.5 16.5 H18.5" stroke="#0284c7" stroke-width="2" stroke-linecap="round" />
+                <!-- Strobes -->
+                <circle cx="14" cy="8" r="1.8" fill="#ef4444" class="animate-pulse" />
+                <circle cx="26" cy="8" r="1.8" fill="#3b82f6" class="animate-ping" />
+                <!-- Wheels -->
+                <circle cx="10" cy="30" r="3" fill="#0f172a" />
+                <circle cx="30" cy="30" r="3" fill="#0f172a" />
+              </svg>
+            </div>
+            <!-- Call Sign Tag -->
+            <div class="mt-1 bg-slate-950 text-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded shadow border border-slate-700 whitespace-nowrap">
+              ${amb.call_sign}
+            </div>
           </div>
         `,
-        iconSize: [36, 40],
-        iconAnchor: [18, 20],
+        iconSize: [44, 52],
+        iconAnchor: [22, 26],
       });
       L.marker([amb.latitude, amb.longitude], { icon: ambIcon }).addTo(markersLayer);
     });
@@ -481,8 +513,8 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
   };
 
   return (
-    <div className={`relative w-full h-full min-h-[420px] rounded-2xl overflow-hidden border shadow-lg flex flex-col transition-all ${
-      isDark ? 'border-slate-800 bg-[#060913]' : 'border-slate-200/90 bg-slate-100 shadow-slate-200/50'
+    <div className={`relative w-full h-full min-h-[380px] rounded-xl overflow-hidden border shadow-sm flex flex-col transition-colors ${
+      isDark ? 'border-slate-800 bg-[#06090e]' : 'border-slate-200 bg-slate-100'
     }`}>
       {/* Map Canvas */}
       <div ref={mapContainerRef} className="w-full h-full flex-1 relative z-0" />
@@ -490,15 +522,15 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
       {/* TOP-LEFT: Map Controls & Traffic Toggle */}
       <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 pointer-events-auto">
         {/* Engine Switcher */}
-        <div className={`backdrop-blur-xl border p-1 rounded-xl shadow-lg flex items-center gap-1 ${
-          isDark ? 'bg-[#080d1a]/90 border-slate-700/80 text-white' : 'bg-white/90 border-slate-200 text-slate-800'
+        <div className={`backdrop-blur-md border p-1 rounded-lg shadow-md flex items-center gap-1 ${
+          isDark ? 'bg-[#0b101c]/95 border-slate-800' : 'bg-white/95 border-slate-200'
         }`}>
           <button
             type="button"
             onClick={() => setMapEngine('google')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
               mapEngine === 'google'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                ? 'bg-blue-600 text-white shadow-sm font-semibold'
                 : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -509,9 +541,9 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
           <button
             type="button"
             onClick={() => setMapEngine('leaflet')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
               mapEngine === 'leaflet'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                ? 'bg-red-600 text-white shadow-sm font-semibold'
                 : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -522,26 +554,26 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
 
         {/* Google Maps View Styles */}
         {mapEngine === 'google' && (
-          <div className={`backdrop-blur-xl border p-1 rounded-xl shadow-lg flex items-center gap-1 ${
-            isDark ? 'bg-[#080d1a]/90 border-slate-700/80 text-white' : 'bg-white/90 border-slate-200 text-slate-800'
+          <div className={`backdrop-blur-md border p-1 rounded-lg shadow-md flex items-center gap-1 ${
+            isDark ? 'bg-[#0b101c]/95 border-slate-800' : 'bg-white/95 border-slate-200'
           }`}>
             <button
               type="button"
               onClick={() => setMapType('roadmap')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-2 py-1 rounded-md text-[11px] transition-all ${
                 mapType === 'roadmap'
-                  ? isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'
+                  ? isDark ? 'bg-slate-800 text-white font-semibold' : 'bg-slate-200 text-slate-900 font-semibold'
                   : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Roadmap
+              Roadmap (Light)
             </button>
             <button
               type="button"
               onClick={() => setMapType('satellite')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-2 py-1 rounded-md text-[11px] transition-all ${
                 mapType === 'satellite'
-                  ? isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'
+                  ? isDark ? 'bg-slate-800 text-white font-semibold' : 'bg-slate-200 text-slate-900 font-semibold'
                   : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -550,9 +582,9 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
             <button
               type="button"
               onClick={() => setMapType('dark')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-2 py-1 rounded-md text-[11px] transition-all ${
                 mapType === 'dark'
-                  ? isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'
+                  ? isDark ? 'bg-slate-800 text-white font-semibold' : 'bg-slate-200 text-slate-900 font-semibold'
                   : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -566,10 +598,10 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
           <button
             type="button"
             onClick={() => setTrafficEnabled(!trafficEnabled)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 shadow-lg backdrop-blur-xl transition-all ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 shadow-md backdrop-blur-md transition-all ${
               trafficEnabled
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30'
-                : isDark ? 'bg-[#080d1a]/90 border-slate-700/80 text-slate-400 hover:text-white' : 'bg-white/90 border-slate-200 text-slate-600 hover:text-slate-900'
+                ? 'bg-emerald-600 text-white font-semibold border-emerald-600 shadow-sm'
+                : isDark ? 'bg-[#0b101c]/95 border-slate-800 text-slate-400 hover:text-white' : 'bg-white/95 border-slate-200 text-slate-600 hover:text-slate-900'
             }`}
             title="Real-time live Google Traffic Layer for emergency response vehicles"
           >
@@ -580,28 +612,42 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
       </div>
 
       {/* TOP-RIGHT: Live Emergency Legend */}
-      <div className={`absolute top-3 right-3 z-[400] backdrop-blur-xl border p-3 rounded-2xl shadow-xl text-xs space-y-1.5 pointer-events-auto max-w-[200px] ${
-        isDark ? 'bg-[#080d1a]/90 border-slate-700/80 text-slate-300' : 'bg-white/90 border-slate-200 text-slate-700'
+      <div className={`absolute top-3 right-3 z-[400] backdrop-blur-md border p-2.5 rounded-lg shadow-md text-xs space-y-1.5 pointer-events-auto max-w-[190px] ${
+        isDark ? 'bg-[#0b101c]/95 border-slate-800 text-slate-300' : 'bg-white/95 border-slate-200 text-slate-700'
       }`}>
-        <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
           <span>{mapEngine === 'google' ? 'Google Maps Live' : 'CartoDB Live'}</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white shrink-0 animate-ping"></span>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white shrink-0"></span>
           <span className="truncate">Emergency Incident</span>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold">
-          <span className="w-3.5 h-3.5 rounded bg-emerald-600 border border-white flex items-center justify-center text-[8px] font-bold text-white shrink-0">H</span>
-          <span className="truncate">Trauma Hospital</span>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="w-3.5 h-3.5 rounded bg-emerald-600 border border-white flex items-center justify-center p-0.5 shrink-0">
+            <svg viewBox="0 0 16 16" className="w-full h-full" fill="none">
+              <rect x="3" y="2" width="10" height="12" rx="1" fill="#ffffff" />
+              <rect x="7" y="4" width="2" height="4" fill="#dc2626" />
+              <rect x="6" y="5" width="4" height="2" fill="#dc2626" />
+              <rect x="5" y="9" width="1.5" height="1.5" fill="#0284c7" />
+              <rect x="9.5" y="9" width="1.5" height="1.5" fill="#0284c7" />
+            </svg>
+          </span>
+          <span className="truncate font-medium">Trauma Hospital</span>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold">
-          <span className="w-3.5 h-3.5 rounded bg-amber-500 border border-white flex items-center justify-center text-[9px] shrink-0">🚑</span>
-          <span className="truncate">Active Ambulance</span>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-white flex items-center justify-center p-0.5 shrink-0">
+            <svg viewBox="0 0 16 16" className="w-full h-full" fill="none">
+              <rect x="1" y="4" width="14" height="8" rx="1.5" fill="#ffffff" />
+              <rect x="1" y="7" width="14" height="2" fill="#dc2626" />
+              <rect x="11" y="5" width="3" height="3" fill="#38bdf8" />
+            </svg>
+          </span>
+          <span className="truncate font-medium">Active Ambulance</span>
         </div>
         {activeDispatch && (
-          <div className="flex items-center gap-2 text-rose-600 font-bold pt-1 border-t border-slate-200 dark:border-slate-800 text-[10px]">
-            <span className="w-3.5 h-1 bg-rose-600 rounded-full shrink-0"></span>
+          <div className="flex items-center gap-2 text-red-600 font-medium pt-1 border-t border-slate-200 dark:border-slate-800 text-[10px]">
+            <span className="w-3 h-0.5 bg-red-600 rounded shrink-0"></span>
             <span>Emergency Corridor</span>
           </div>
         )}
@@ -612,8 +658,8 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
         <button
           type="button"
           onClick={() => handleZoom(1)}
-          className={`w-9 h-9 rounded-xl border flex items-center justify-center shadow-lg backdrop-blur-xl transition-all ${
-            isDark ? 'bg-[#080d1a]/90 hover:bg-slate-800 border-slate-700 text-white' : 'bg-white/90 hover:bg-slate-100 border-slate-200 text-slate-700'
+          className={`w-8 h-8 rounded-lg border flex items-center justify-center shadow-md transition-colors ${
+            isDark ? 'bg-[#0b101c]/95 hover:bg-slate-800 border-slate-800 text-white' : 'bg-white/95 hover:bg-slate-100 border-slate-200 text-slate-700'
           }`}
           title="Zoom In"
         >
@@ -622,8 +668,8 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
         <button
           type="button"
           onClick={() => handleZoom(-1)}
-          className={`w-9 h-9 rounded-xl border flex items-center justify-center shadow-lg backdrop-blur-xl transition-all ${
-            isDark ? 'bg-[#080d1a]/90 hover:bg-slate-800 border-slate-700 text-white' : 'bg-white/90 hover:bg-slate-100 border-slate-200 text-slate-700'
+          className={`w-8 h-8 rounded-lg border flex items-center justify-center shadow-md transition-colors ${
+            isDark ? 'bg-[#0b101c]/95 hover:bg-slate-800 border-slate-800 text-white' : 'bg-white/95 hover:bg-slate-100 border-slate-200 text-slate-700'
           }`}
           title="Zoom Out"
         >
@@ -632,8 +678,8 @@ export const EmergencyMap: React.FC<EmergencyMapProps> = ({
         <button
           type="button"
           onClick={handleRecenter}
-          className={`w-9 h-9 rounded-xl border flex items-center justify-center shadow-lg backdrop-blur-xl transition-all ${
-            isDark ? 'bg-[#080d1a]/90 hover:bg-rose-600 border-slate-700 text-white' : 'bg-white/90 hover:bg-rose-600 hover:text-white border-slate-200 text-rose-600'
+          className={`w-8 h-8 rounded-lg border flex items-center justify-center shadow-md transition-colors ${
+            isDark ? 'bg-[#0b101c]/95 hover:bg-red-600 border-slate-800 text-white' : 'bg-white/95 hover:bg-red-600 hover:text-white border-slate-200 text-red-600'
           }`}
           title="Center on Emergency SOS Incident"
         >

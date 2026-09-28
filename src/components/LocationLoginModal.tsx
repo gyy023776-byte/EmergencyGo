@@ -818,15 +818,19 @@ export const LocationLoginModal: React.FC<LocationLoginModalProps> = ({
               </div>
               <div>
                 <div className="font-semibold text-[11px] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <span>Owner Database Live Console</span>
-                  {isAdminMode && (
+                  <span>Owner Mode & Database Console</span>
+                  {isAdminMode ? (
                     <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-500 font-bold">
                       ACTIVE
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-slate-200 dark:bg-slate-800 text-slate-400 font-bold flex items-center gap-0.5">
+                      <Lock className="w-2.5 h-2.5" /> LOCKED
                     </span>
                   )}
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  {isAdminMode ? 'Live indicators & telemetry deck visible' : 'Hidden from normal users. Click to view.'}
+                  {isAdminMode ? 'Owner controls active. Click to lock.' : 'Strictly restricted to system owner. Password required.'}
                 </div>
               </div>
             </div>
@@ -840,8 +844,8 @@ export const LocationLoginModal: React.FC<LocationLoginModalProps> = ({
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
                 }`}
               >
-                <Database className="w-3.5 h-3.5" />
-                <span>{isAdminMode ? 'Hide Database' : 'View Database Live'}</span>
+                {isAdminMode ? <Database className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                <span>{isAdminMode ? 'Lock Owner Mode' : 'Owner Login (Password)'}</span>
               </button>
             )}
           </div>

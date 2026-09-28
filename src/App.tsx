@@ -4,7 +4,8 @@ import {
   Activity, Users, User, Building2, Radio, Sparkles,
   PhoneCall, RefreshCw, ChevronRight, CheckCircle2, AlertTriangle,
   Sun, Moon, Compass, Plus, Phone, Crosshair, Navigation,
-  Lock, Unlock, Terminal, Heart, Bot
+  Lock, Unlock, Terminal, Heart, Bot, KeyRound, ShieldCheck,
+  MessageSquareHeart
 } from 'lucide-react';
 import { 
   Hospital, Ambulance, Dispatch, UserAccount, SystemConfig 
@@ -15,10 +16,12 @@ import { SetupModal } from './components/SetupModal.tsx';
 import { SOSModal } from './components/SOSModal.tsx';
 import { LocationLoginModal } from './components/LocationLoginModal.tsx';
 import { ResqChatModal } from './components/ResqChatModal.tsx';
-import { HeroEmergency } from './components/HeroEmergency.tsx';
 import { ActiveDispatchBanner } from './components/ActiveDispatchBanner.tsx';
 import { HospitalAdminView } from './components/HospitalAdminView.tsx';
 import { DriverCADView } from './components/DriverCADView.tsx';
+import { OwnerAuthModal } from './components/OwnerAuthModal.tsx';
+import { AmbulanceLogo } from './components/AmbulanceLogo.tsx';
+import { FeedbackModal } from './components/FeedbackModal.tsx';
 
 export default function App() {
   // Theme State: Default to 'light' as requested by the user, with one-click toggle to dark
@@ -107,45 +110,57 @@ export default function App() {
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isSosOpen, setIsSosOpen] = useState(false);
   const [isResqOpen, setIsResqOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [activeDispatchId, setActiveDispatchId] = useState<string | null>(null);
 
-  // Admin / Owner Mode: Restricted to authorized developer/owner ("only i should see")
+  // Admin / Owner Mode: Strictly restricted to authorized system owner ("no one should enter except me")
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(sessionStorage.getItem('emergencygo_owner_session'));
+    }
+    return false;
+  });
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
+  const [dbLatencyMs, setDbLatencyMs] = useState(12);
+
+  const handleExitOwnerMode = useCallback(() => {
+    setIsAdminMode(false);
+    sessionStorage.removeItem('emergencygo_owner_session');
+    localStorage.setItem('emergencygo_is_admin', 'false');
+    setLocationToast({
+      message: '🔒 Owner Mode Locked. System database is now shielded.',
+      type: 'info',
+    });
+    setTimeout(() => setLocationToast(null), 3000);
+  }, []);
+
+  // If URL explicitly requests owner/admin mode, require password prompt
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('admin') === 'true' || urlParams.get('owner') === 'true' || urlParams.get('db') === 'live') {
-        return true;
+        if (!sessionStorage.getItem('emergencygo_owner_session')) {
+          setShowAdminAuthModal(true);
+        }
       }
     }
-    return localStorage.getItem('emergencygo_is_admin') === 'true';
-  });
-  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
-  const [adminPasscode, setAdminPasscode] = useState('');
-  const [adminPassError, setAdminPassError] = useState('');
-  const [dbLatencyMs, setDbLatencyMs] = useState(12);
+  }, []);
 
-  // Keyboard shortcut listener: Ctrl+Shift+D or Alt+D to toggle Owner Mode
+  // Keyboard shortcut listener: Ctrl+Shift+D or Alt+D to toggle Owner Mode (requests password when locked)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
         e.preventDefault();
-        setIsAdminMode((prev) => {
-          const next = !prev;
-          localStorage.setItem('emergencygo_is_admin', String(next));
-          setLocationToast({
-            message: next 
-              ? '🟢 Owner Mode Activated! Database Live button and Diagnostics Deck are now visible in the header.'
-              : '🔒 Owner Mode Deactivated. Database is hidden from public callers.',
-            type: 'info',
-          });
-          setTimeout(() => setLocationToast(null), 4000);
-          return next;
-        });
+        if (isAdminMode) {
+          handleExitOwnerMode();
+        } else {
+          setShowAdminAuthModal(true);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isAdminMode, handleExitOwnerMode]);
 
   // Quick Hotline Modal state
   const [showHotlines, setShowHotlines] = useState(false);
@@ -413,45 +428,46 @@ export default function App() {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans selection:bg-rose-500 selection:text-white transition-colors ${
-      isDark ? 'bg-[#060913] text-slate-100' : 'bg-slate-50/70 text-slate-900'
+    <div className={`min-h-screen flex flex-col font-sans selection:bg-red-500 selection:text-white transition-colors ${
+      isDark ? 'bg-[#06090e] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* 1. TOP NAVIGATION & SYSTEM STATUS BAR */}
-      <header className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors ${
-        isDark ? 'bg-[#080d1a]/90 border-slate-800/80 shadow-lg' : 'bg-white/90 border-slate-200/80 shadow-xs'
+      <header className={`sticky top-0 z-40 backdrop-blur-md border-b transition-colors ${
+        isDark ? 'bg-[#090e17]/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-xs'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-          {/* Logo & City Info */}
+          {/* Brand Logo with Official Ambulance Star of Life Crest */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-600 via-rose-600 to-red-700 flex items-center justify-center text-white shadow-md shadow-red-600/30 border border-white/20">
-              <Siren className="w-5 h-5 animate-pulse" />
-            </div>
+            <AmbulanceLogo size="md" variant="emblem" animateLights={true} className="shrink-0" />
             <div>
               <div className="flex items-center gap-2">
-                <span className={`text-base sm:text-lg font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span className={`text-base font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   EmergencyGo
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-rose-600/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                  RESQ
+                <span className="text-slate-400 text-xs">/</span>
+                <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+                  isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {config.city}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>Active CAD Dispatch Grid · {config.city}</span>
+                <span>Active EMS Dispatch Grid Online</span>
               </div>
             </div>
           </div>
 
           {/* Role Segmented Controller */}
-          <div className={`flex items-center p-1 rounded-2xl gap-1 border shadow-inner ${
-            isDark ? 'bg-[#0b101c] border-slate-800' : 'bg-slate-100 border-slate-200'
+          <div className={`flex items-center p-1 rounded-xl gap-1 border ${
+            isDark ? 'bg-[#0a0f19] border-slate-800' : 'bg-slate-100 border-slate-200'
           }`}>
             <button
               onClick={() => setActiveRole('patient')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 activeRole === 'patient'
-                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-600/25'
-                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  ? 'btn-3d-red text-white font-bold shadow-md'
+                  : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               <User className="w-3.5 h-3.5" />
@@ -459,10 +475,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveRole('driver')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 activeRole === 'driver'
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-600/25'
-                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  ? 'btn-3d-amber text-white font-bold shadow-md'
+                  : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               <Siren className="w-3.5 h-3.5" />
@@ -470,10 +486,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveRole('hospital_admin')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 activeRole === 'hospital_admin'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/25'
-                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  ? 'btn-3d-purple text-white font-bold shadow-md'
+                  : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
@@ -486,90 +502,128 @@ export default function App() {
             {/* User Profile & Location Status Button */}
             <button
               onClick={() => setIsLocationModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                 userProfile.name && isGpsActive
                   ? isDark 
-                    ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50 shadow-sm' 
+                    ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50' 
                     : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-xs'
                   : isDark
-                    ? 'bg-rose-950/40 border-rose-800/80 text-rose-300 hover:bg-rose-900/50 ring-1 ring-rose-500/50 shadow-sm'
-                    : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 shadow-xs ring-1 ring-rose-400/50'
+                    ? 'bg-red-950/40 border-red-800/80 text-red-300 hover:bg-red-900/50 ring-1 ring-red-500/50'
+                    : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-xs ring-1 ring-red-400/50'
               }`}
               title="Click to view/edit user profile, password, or GPS location"
             >
-              <Crosshair className={`w-3.5 h-3.5 ${isGpsActive ? 'text-emerald-500 animate-pulse' : 'text-rose-500 animate-ping'}`} />
-              <span className="font-bold hidden sm:inline">
-                {userProfile.name ? userProfile.name.split(' ')[0] : 'Profile'}
+              <Crosshair className={`w-3.5 h-3.5 ${isGpsActive ? 'text-emerald-500 animate-pulse' : 'text-red-500 animate-ping'}`} />
+              <span className="font-semibold hidden sm:inline">
+                {userProfile.name ? userProfile.name.split(' ')[0] : 'Register & Set Password'}
               </span>
               <span className="opacity-40 hidden sm:inline">·</span>
-              <span className="font-bold truncate max-w-[85px] sm:max-w-none">
-                {isGpsActive ? `${config.city}` : 'GPS'}
+              <span className="font-semibold truncate max-w-[85px] sm:max-w-none">
+                {isGpsActive ? `${config.city}` : 'Enable GPS'}
               </span>
-              <span className={`w-1.5 h-1.5 rounded-full ${isGpsActive ? 'bg-emerald-500 animate-ping' : 'bg-rose-500 animate-bounce'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${isGpsActive ? 'bg-emerald-500 animate-ping' : 'bg-red-500 animate-bounce'}`} />
             </button>
 
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
                 isDark 
-                  ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-amber-300 shadow-sm' 
+                  ? 'bg-[#0b101c] hover:bg-slate-800 border-slate-800 text-amber-300' 
                   : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-xs'
               }`}
               title={isDark ? 'Switch to Clean Light Theme' : 'Switch to Tactical Dark Theme'}
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              <span className="hidden md:inline">{isDark ? 'Light' : 'Dark'}</span>
             </button>
 
             {/* Quick Hotlines Toggle */}
             <button
               onClick={() => setShowHotlines(!showHotlines)}
-              className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
                 showHotlines
-                  ? 'bg-red-50 text-red-600 border-red-200 shadow-xs'
+                  ? 'bg-red-50 text-red-600 border-red-200 font-semibold'
                   : isDark
-                    ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                    ? 'bg-[#0b101c] hover:bg-slate-800 border-slate-800 text-slate-300'
                     : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-xs'
               }`}
             >
-              <Phone className="w-3.5 h-3.5 text-rose-600" />
+              <Phone className="w-3.5 h-3.5 text-red-600" />
               <span className="hidden sm:inline">108 / 112</span>
             </button>
 
-            {/* RESQ Crisis AI Chatbot Button */}
+            {/* Submit User Feedback Button */}
+            <button
+              onClick={() => setIsFeedbackOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                isDark 
+                  ? 'bg-[#0b101c] hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white' 
+                  : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-xs'
+              }`}
+              title="Submit User Feedback & Service Review"
+            >
+              <MessageSquareHeart className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+              <span className="hidden sm:inline">Feedback</span>
+            </button>
+
+            {/* RESQ Crisis AI Chatbot Button (3D Pill) */}
             <button
               onClick={() => setIsResqOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-black transition-all shadow-md bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white border-red-500/50 shadow-red-600/25"
+              className="btn-3d-resq flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white tracking-wide"
               title="Open RESQ Emergency Navigation & Crisis Assistant"
             >
-              <Bot className="w-4 h-4 animate-pulse" />
+              <Bot className="w-3.5 h-3.5 animate-pulse" />
               <span>RESQ AI</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
             </button>
 
-            {/* Ingestion & DB Live Setup: ONLY visible to Owner / "i" */}
-            {isAdminMode && (
+            {/* Owner Access Control (Password Protected) */}
+            {!isAdminMode ? (
               <button
-                onClick={() => setIsSetupOpen(true)}
-                className={`flex items-center gap-2 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${
+                onClick={() => setShowAdminAuthModal(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                   isDark 
-                    ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-700 text-emerald-300 ring-1 ring-emerald-500/50' 
-                    : 'bg-emerald-600 hover:bg-emerald-700 border-emerald-700 text-white'
+                    ? 'bg-[#0b101c] hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white' 
+                    : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-xs'
                 }`}
-                title="Database Live & Ingestion Inspector (Owner Mode)"
+                title="Enter Owner Mode (Password Protected)"
               >
-                <Database className="w-3.5 h-3.5 animate-pulse" />
-                <span>DB Live</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Owner Login</span>
               </button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsSetupOpen(true)}
+                  className="btn-3d-emerald flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white"
+                  title="Database Live & Ingestion Inspector (Owner Mode)"
+                >
+                  <Database className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Database Live</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span>
+                </button>
+                <button
+                  onClick={handleExitOwnerMode}
+                  className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${
+                    isDark 
+                      ? 'border-red-900/60 text-red-300 hover:bg-red-950/50' 
+                      : 'border-red-200 text-red-600 hover:bg-red-50'
+                  }`}
+                  title="Lock / Exit Owner Mode"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Lock</span>
+                </button>
+              </div>
             )}
 
-            {/* Primary SOS Action */}
+            {/* Primary SOS Action (3D Physical Button) */}
             <button
               onClick={() => setIsSosOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-red-600/30 border border-white/20 transition-all"
+              className="btn-3d-red flex items-center gap-1.5 px-4 py-1.5 text-white text-xs font-black rounded-xl tracking-wide"
             >
-              <Siren className="w-4 h-4 animate-pulse" />
+              <Siren className="w-3.5 h-3.5 animate-bounce" />
               <span>ONE-TAP SOS</span>
             </button>
           </div>
@@ -626,6 +680,14 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowAdminAuthModal(true)}
+              className="px-2.5 py-1 rounded border border-emerald-400/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[11px] font-medium transition flex items-center gap-1.5"
+              title="Change your secret owner password"
+            >
+              <KeyRound className="w-3 h-3 text-emerald-400" />
+              <span>Change Password</span>
+            </button>
+            <button
               onClick={() => setIsSetupOpen(true)}
               className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1.5 transition shadow-xs"
             >
@@ -633,13 +695,11 @@ export default function App() {
               <span>Open DB & Setup Inspector</span>
             </button>
             <button
-              onClick={() => {
-                setIsAdminMode(false);
-                localStorage.setItem('emergencygo_is_admin', 'false');
-              }}
-              className="px-2.5 py-1 rounded border border-emerald-400/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[11px] font-medium transition"
+              onClick={handleExitOwnerMode}
+              className="px-2.5 py-1 rounded border border-red-500/50 hover:bg-red-100 dark:hover:bg-red-950/60 text-red-600 dark:text-red-300 text-[11px] font-semibold transition flex items-center gap-1"
             >
-              Exit Owner Mode
+              <Lock className="w-3 h-3" />
+              <span>Lock Owner Mode</span>
             </button>
           </div>
         </div>
@@ -663,15 +723,86 @@ export default function App() {
 
         {/* 2. CITIZEN / EMERGENCY CALLER VIEW */}
         {activeRole === 'patient' && (
-          <div className="space-y-6">
-            {/* Attractive Hero Action & RESQ Assistant Card */}
-            <HeroEmergency
-              onTriggerSOS={() => setIsSosOpen(true)}
-              onOpenResq={() => setIsResqOpen(true)}
-              nearestHospital={filteredHospitals[0] || hospitals[0] || null}
-              city={config.city}
-              isDark={isDark}
-            />
+          <div className="space-y-5">
+            {/* Attractive EMS Overview & Emergency Hero Deck */}
+            <div className={`rounded-2xl p-5 sm:p-6 border transition-all relative overflow-hidden ${
+              isDark 
+                ? 'bg-gradient-to-br from-[#0c1322] via-[#090e1a] to-[#06090e] border-slate-800 shadow-xl' 
+                : 'bg-gradient-to-br from-white via-slate-50 to-red-50/20 border-slate-200/90 shadow-sm'
+            }`}>
+              {/* Subtle emergency background glow */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex flex-wrap items-center justify-between gap-6 relative z-10">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                      Rapid EMS Grid Online
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
+                    <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Metropolitan: <strong>{config.city}</strong></span>
+                    <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
+                    <span className="text-slate-400 font-medium">{hospitals.length} Verified ER Facilities</span>
+                  </div>
+
+                  <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    Real-Time Emergency Ambulance & Hospital Dispatch Grid
+                  </h1>
+
+                  <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    PostGIS sub-second road transit calculations, live ER/ICU capacity telemetry, and direct GPS-linked paramedic dispatch for immediate critical care.
+                  </p>
+
+                  {/* High-visibility Live Stats Strip */}
+                  <div className="flex flex-wrap items-center gap-4 pt-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <AmbulanceLogo size="sm" variant="badge" animateLights={true} />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {ambulances.length} Ambulances on Patrol
+                      </span>
+                    </div>
+                    <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
+                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                      <span>Avg Response ETA: <strong>~4.2 mins</strong></span>
+                    </div>
+                    <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
+                    <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-semibold">
+                      <span>Direct Hotline: <strong>108 / 112</strong></span>
+                    </div>
+                    <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
+                    <button
+                      onClick={() => setIsFeedbackOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-rose-500 hover:text-rose-600 dark:text-rose-400 font-bold hover:underline cursor-pointer"
+                    >
+                      <MessageSquareHeart className="w-3.5 h-3.5" />
+                      <span>Submit Feedback</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hero Ambulance Vehicle Graphic & Direct SOS CTA */}
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="hidden lg:flex flex-col items-center p-3 rounded-2xl bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                    <AmbulanceLogo size="lg" variant="vehicle" animateLights={true} />
+                    <span className="text-[10px] font-mono text-slate-400 font-bold mt-1 tracking-wider">
+                      RAPID RESPONSE EMS
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setIsSosOpen(true)}
+                    className="btn-3d-red w-full sm:w-auto px-7 py-4 text-white font-black rounded-2xl text-sm flex items-center justify-center gap-3 tracking-wide"
+                  >
+                    <div className="relative">
+                      <Siren className="w-5 h-5 animate-pulse" />
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping" />
+                    </div>
+                    <span>ONE-TAP EMERGENCY SOS</span>
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Split View: Live Map & Hospitals Dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -691,17 +822,61 @@ export default function App() {
                   />
                 </div>
 
-                <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
-                  isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
+                {/* Attractive Ambulance Fleet Live Telemetry Deck */}
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  isDark ? 'bg-[#090e18] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" />
-                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Live EMS Telemetry</span>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800/80 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <AmbulanceLogo size="sm" variant="badge" animateLights={true} />
+                      <span className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        Active EMS Fleet Radar
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{ambulances.length} Units Dispatched</span>
+                    </div>
                   </div>
-                  <div className={`flex items-center gap-3 font-mono text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    <span>{ambulances.length} Active Ambulances</span>
-                    <span>•</span>
-                    <span>{filteredHospitals.length} Facilities Ready</span>
+
+                  <div className="space-y-2">
+                    {ambulances.map((amb) => {
+                      const isBusy = amb.status !== 'available';
+                      return (
+                        <div
+                          key={amb.id}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
+                            isDark ? 'bg-slate-900/60 border-slate-800/90' : 'bg-slate-50 border-slate-200/80'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <AmbulanceLogo size="sm" variant="emblem" animateLights={isBusy} className="shrink-0" />
+                            <div>
+                              <div className="font-bold flex items-center gap-1.5 text-xs">
+                                <span className={isDark ? 'text-white' : 'text-slate-900'}>{amb.call_sign}</span>
+                                <span className="text-[10px] font-mono text-amber-500 font-semibold">({amb.vehicle_type})</span>
+                              </div>
+                              <div className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                Paramedic: {amb.driver_name} · Reg: {amb.vehicle_number}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              isBusy 
+                                ? 'bg-red-500/20 text-red-500 border border-red-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
+                            }`}>
+                              {isBusy ? 'EN ROUTE' : 'READY'}
+                            </span>
+                            <div className="text-[10px] font-mono text-slate-400 mt-0.5 font-bold">
+                              {amb.speed_kmh} km/h
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -709,11 +884,11 @@ export default function App() {
               {/* Hospital Finder & Capacity Feed (7 Cols) */}
               <div className="lg:col-span-7 space-y-4">
                 {/* Search & Radius Filter Bar */}
-                <div className={`p-4 sm:p-5 rounded-2xl border space-y-3.5 transition-colors shadow-sm ${
-                  isDark ? 'bg-[#0b101c]/90 border-slate-800' : 'bg-white border-slate-200/90 shadow-xs'
+                <div className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                  isDark ? 'bg-[#0b101c] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
                   {/* Quick City Presets */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
                     <span className={`text-[10px] uppercase font-bold shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       City:
                     </span>
@@ -728,12 +903,12 @@ export default function App() {
                       <button
                         key={cityItem.name}
                         onClick={() => handleLocationGranted(cityItem.lat, cityItem.lng, cityItem.name)}
-                        className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all border text-xs ${
+                        className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition border ${
                           config.city.toLowerCase().includes(cityItem.name.toLowerCase().split(' ')[0])
-                            ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/20'
+                            ? 'bg-red-600 text-white border-red-600 font-semibold shadow-xs'
                             : isDark
                               ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs'
                         }`}
                       >
                         {cityItem.name}
@@ -741,7 +916,7 @@ export default function App() {
                     ))}
                     <button
                       onClick={() => setIsLocationModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center gap-1 text-xs"
+                      className="px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center gap-1"
                     >
                       <Crosshair className="w-3 h-3" />
                       <span>Use GPS</span>
@@ -750,13 +925,13 @@ export default function App() {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative flex-1 min-w-[200px]">
-                      <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search hospitals by name, specialty, or area..."
-                        className={`w-full rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 border transition-all ${
+                        className={`w-full rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 border ${
                           isDark 
                             ? 'bg-[#070b12] border-slate-800 text-white placeholder:text-slate-500' 
                             : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
@@ -765,7 +940,7 @@ export default function App() {
                     </div>
 
                     {/* Radius Slider */}
-                    <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border ${
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
                       isDark ? 'bg-[#070b12] border-slate-800' : 'bg-slate-50 border-slate-200'
                     }`}>
                       <span className={`text-[11px] whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Radius:</span>
@@ -776,7 +951,7 @@ export default function App() {
                         step="1"
                         value={radiusKm}
                         onChange={(e) => setRadiusKm(parseInt(e.target.value, 10))}
-                        className="w-20 accent-rose-600 cursor-pointer"
+                        className="w-20 accent-red-600 cursor-pointer"
                       />
                       <span className={`text-xs font-mono font-bold whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         {radiusKm} km
@@ -784,14 +959,14 @@ export default function App() {
                     </div>
 
                     {/* Sort Selector */}
-                    <div className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border ${
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
                       isDark ? 'bg-[#070b12] border-slate-800' : 'bg-slate-50 border-slate-200'
                     }`}>
                       <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Sort:</span>
                       <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as any)}
-                        className={`bg-transparent text-xs font-bold focus:outline-none cursor-pointer ${
+                        className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
                           isDark ? 'text-white' : 'text-slate-900'
                         }`}
                       >
@@ -804,9 +979,9 @@ export default function App() {
                     {/* ER Open Only Toggle */}
                     <button
                       onClick={() => setEmergencyOnly(!emergencyOnly)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                      className={`px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors border ${
                         emergencyOnly
-                          ? 'bg-emerald-600 text-white font-bold border-emerald-600 shadow-sm shadow-emerald-600/20'
+                          ? 'bg-emerald-600 text-white font-semibold border-emerald-600'
                           : isDark
                             ? 'bg-[#070b12] border-slate-800 text-slate-400 hover:text-white'
                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900'
@@ -818,15 +993,15 @@ export default function App() {
                   </div>
 
                   {/* Capabilities Filter Bar */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 scrollbar-none">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5">
                     <button
                       onClick={() => setSelectedCapability('')}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
                         !selectedCapability
-                          ? 'bg-rose-600 text-white shadow-xs'
+                          ? 'bg-red-600 text-white font-semibold'
                           : isDark
                             ? 'bg-[#070b12] text-slate-400 hover:text-slate-200 border border-slate-800'
-                            : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200'
+                            : 'bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200'
                       }`}
                     >
                       All Services
@@ -835,12 +1010,12 @@ export default function App() {
                       <button
                         key={cap}
                         onClick={() => setSelectedCapability(selectedCapability === cap ? '' : cap)}
-                        className={`px-3 py-1 rounded-xl text-xs whitespace-nowrap font-bold transition-all ${
+                        className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap font-medium transition-colors ${
                           selectedCapability === cap
-                            ? 'bg-rose-600 text-white shadow-xs'
+                            ? 'bg-red-600 text-white font-semibold'
                             : isDark
                               ? 'bg-[#070b12] text-slate-400 hover:text-slate-200 border border-slate-800'
-                              : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200'
+                              : 'bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200'
                         }`}
                       >
                         {cap}
@@ -1004,89 +1179,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Authorized Owner / System Access Modal */}
-      {showAdminAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className={`border rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl ${
-            isDark ? 'bg-[#0b101c] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-600/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center">
-                  <Database className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base">Owner & Database Console</h3>
-                  <p className="text-[11px] text-slate-400">Unlock live database telemetry & SQL console</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAdminAuthModal(false);
-                  setAdminPassError('');
-                  setAdminPasscode('');
-                }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Unlocking Owner Mode reveals the glowing <strong>Database Live</strong> button in the top navigation bar and the <strong>Diagnostics Deck</strong> banner showing connection status, PostGIS queries, and database tables.
-            </p>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setIsAdminMode(true);
-                localStorage.setItem('emergencygo_is_admin', 'true');
-                setShowAdminAuthModal(false);
-                setAdminPasscode('');
-                setLocationToast({
-                  message: '🟢 Owner Mode Unlocked! Database Live button and Diagnostics Deck are now visible in the header.',
-                  type: 'success',
-                });
-                setTimeout(() => setLocationToast(null), 5000);
-              }}
-              className="space-y-3"
-            >
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Operator Passcode (Optional for demo)
-                </label>
-                <input
-                  type="password"
-                  value={adminPasscode}
-                  onChange={(e) => setAdminPasscode(e.target.value)}
-                  placeholder="Enter passcode or click Unlock below"
-                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAdminAuthModal(false)}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Database className="w-3.5 h-3.5" />
-                  <span>Unlock Database Live</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Location Permission & User Profile Modal */}
       <LocationLoginModal
         isOpen={isLocationModalOpen}
@@ -1105,16 +1197,11 @@ export default function App() {
         theme={theme}
         isAdminMode={isAdminMode}
         onToggleAdminMode={() => {
-          const next = !isAdminMode;
-          setIsAdminMode(next);
-          localStorage.setItem('emergencygo_is_admin', String(next));
-          setLocationToast({
-            message: next
-              ? '🟢 Owner Mode Active: Database Live button & Diagnostics Deck are now visible in the header!'
-              : '🔒 Owner Mode Exited: Database Live is hidden from public callers.',
-            type: 'info',
-          });
-          setTimeout(() => setLocationToast(null), 4000);
+          if (isAdminMode) {
+            handleExitOwnerMode();
+          } else {
+            setShowAdminAuthModal(true);
+          }
         }}
         onLoginSuccess={(loggedUser) => {
           setUserProfile(loggedUser);
@@ -1126,6 +1213,21 @@ export default function App() {
           });
           setTimeout(() => setLocationToast(null), 4000);
         }}
+      />
+
+      {/* Owner Security Password Verification Modal */}
+      <OwnerAuthModal
+        isOpen={showAdminAuthModal}
+        onClose={() => setShowAdminAuthModal(false)}
+        onAuthenticated={() => {
+          setIsAdminMode(true);
+          setLocationToast({
+            message: '🟢 Owner Mode Unlocked! Welcome, System Owner. All database live telemetry and administrative overrides are enabled.',
+            type: 'success',
+          });
+          setTimeout(() => setLocationToast(null), 4000);
+        }}
+        theme={theme}
       />
 
       {/* Interactive Ingestion & Database Setup Modal */}
@@ -1182,22 +1284,50 @@ export default function App() {
         theme={theme}
       />
 
-      {/* Floating RESQ Crisis Assistant Trigger Button */}
-      <div className="fixed bottom-6 right-6 z-40">
+      {/* User Service Experience & Rating Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        currentUser={userProfile.name ? { 
+          id: 'usr-curr', 
+          name: userProfile.name, 
+          phone: userProfile.phone, 
+          email: '', 
+          role: activeRole 
+        } : null}
+        city={config.city}
+        theme={theme}
+      />
+
+      {/* Floating Action Trigger Group */}
+      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5">
+        {/* Floating Feedback Trigger */}
+        <button
+          onClick={() => setIsFeedbackOpen(true)}
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full border text-xs font-bold transition-all shadow-lg hover:scale-105 ${
+            isDark 
+              ? 'bg-[#0f172a]/95 hover:bg-slate-800 border-slate-700 text-slate-200' 
+              : 'bg-white/95 hover:bg-slate-50 border-slate-200 text-slate-800 shadow-slate-300/40'
+          }`}
+          title="Submit User Feedback"
+        >
+          <MessageSquareHeart className="w-4 h-4 text-rose-500 animate-pulse" />
+          <span className="hidden sm:inline">Feedback</span>
+        </button>
+
+        {/* Floating RESQ Crisis Assistant Trigger Button (3D Tactical Pill) */}
         <button
           onClick={() => setIsResqOpen(true)}
-          className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-full font-black text-xs sm:text-sm shadow-2xl emergency-glow border-2 border-white/40 transition-all hover:scale-105 group backdrop-blur-md"
+          className="btn-3d-resq flex items-center gap-2.5 px-4.5 py-3 text-white rounded-full font-bold text-xs sm:text-sm tracking-wide group"
           title="Open RESQ Emergency Navigation & Crisis Assistant"
         >
           <div className="relative">
             <Bot className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-300 rounded-full animate-ping" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full" />
           </div>
           <span>RESQ Crisis AI</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-black/30 font-mono font-bold border border-white/20">
-            108/112
-          </span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-black/30 font-mono font-bold">108/112</span>
         </button>
       </div>
 
