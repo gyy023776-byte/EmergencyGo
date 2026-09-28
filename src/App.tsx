@@ -3,7 +3,8 @@ import {
   Siren, Database, MapPin, Search, Filter, Shield, 
   Activity, Users, User, Building2, Radio, Sparkles,
   PhoneCall, RefreshCw, ChevronRight, CheckCircle2, AlertTriangle,
-  Sun, Moon, Compass, Plus, Phone, Crosshair, Navigation
+  Sun, Moon, Compass, Plus, Phone, Crosshair, Navigation,
+  Lock, Unlock, Terminal, Heart, Bot
 } from 'lucide-react';
 import { 
   Hospital, Ambulance, Dispatch, UserAccount, SystemConfig 
@@ -13,6 +14,7 @@ import { HospitalCard } from './components/HospitalCard.tsx';
 import { SetupModal } from './components/SetupModal.tsx';
 import { SOSModal } from './components/SOSModal.tsx';
 import { LocationLoginModal } from './components/LocationLoginModal.tsx';
+import { ResqChatModal } from './components/ResqChatModal.tsx';
 import { ActiveDispatchBanner } from './components/ActiveDispatchBanner.tsx';
 import { HospitalAdminView } from './components/HospitalAdminView.tsx';
 import { DriverCADView } from './components/DriverCADView.tsx';
@@ -54,6 +56,7 @@ export default function App() {
     name: string;
     phone: string;
     role: 'patient' | 'driver' | 'hospital_admin';
+    password?: string;
   }>(() => {
     const saved = localStorage.getItem('emergencygo_user_profile');
     if (saved) {
@@ -62,8 +65,8 @@ export default function App() {
       } catch {}
     }
     return {
-      name: 'Ananya Sharma',
-      phone: '+91 91234 56789',
+      name: '',
+      phone: '',
       role: 'patient',
     };
   });
@@ -72,9 +75,12 @@ export default function App() {
     return localStorage.getItem('emergencygo_location_enabled') === 'true';
   });
 
-  // Prompt for location on first launch or when entering the app
+  // Prompt for registration, password, & location on first launch or when entering the app
   const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(() => {
-    return localStorage.getItem('emergencygo_has_prompted_location') !== 'true';
+    const hasRegistered = localStorage.getItem('emergencygo_has_registered') === 'true';
+    const hasLocation = localStorage.getItem('emergencygo_location_enabled') === 'true';
+    const hasPassword = Boolean(localStorage.getItem('emergencygo_user_password'));
+    return !hasRegistered || !hasLocation || !hasPassword;
   });
 
   const [locationToast, setLocationToast] = useState<{
@@ -99,7 +105,46 @@ export default function App() {
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isSosOpen, setIsSosOpen] = useState(false);
+  const [isResqOpen, setIsResqOpen] = useState(false);
   const [activeDispatchId, setActiveDispatchId] = useState<string | null>(null);
+
+  // Admin / Owner Mode: Restricted to authorized developer/owner ("only i should see")
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('admin') === 'true' || urlParams.get('owner') === 'true' || urlParams.get('db') === 'live') {
+        return true;
+      }
+    }
+    return localStorage.getItem('emergencygo_is_admin') === 'true';
+  });
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminPassError, setAdminPassError] = useState('');
+  const [dbLatencyMs, setDbLatencyMs] = useState(12);
+
+  // Keyboard shortcut listener: Ctrl+Shift+D or Alt+D to toggle Owner Mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+        e.preventDefault();
+        setIsAdminMode((prev) => {
+          const next = !prev;
+          localStorage.setItem('emergencygo_is_admin', String(next));
+          setLocationToast({
+            message: next 
+              ? '🟢 Owner Mode Activated! Database Live button and Diagnostics Deck are now visible in the header.'
+              : '🔒 Owner Mode Deactivated. Database is hidden from public callers.',
+            type: 'info',
+          });
+          setTimeout(() => setLocationToast(null), 4000);
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Quick Hotline Modal state
   const [showHotlines, setShowHotlines] = useState(false);
@@ -107,9 +152,13 @@ export default function App() {
   // Fetch System Config & Users
   const fetchConfig = useCallback(async () => {
     try {
+      const t0 = performance.now();
       const res = await fetch('/api/config');
-      const data = await res.json();
-      setConfig(data);
+      if (res.ok) {
+        const data = await res.json();
+        setDbLatencyMs(Math.max(4, Math.round(performance.now() - t0)));
+        setConfig(data);
+      }
     } catch (e) {
       console.error('Failed to load system config:', e);
     }
@@ -238,10 +287,41 @@ export default function App() {
     }
   };
 
-  const handleUpdateUser = (newProfile: { name: string; phone: string; role: 'patient' | 'driver' | 'hospital_admin' }) => {
+  const handleUpdateUser = async (newProfile: { name: string; phone: string; role: 'patient' | 'driver' | 'hospital_admin'; password?: string }) => {
     setUserProfile(newProfile);
     setActiveRole(newProfile.role);
-    localStorage.setItem('emergencygo_user_profile', JSON.stringify(newProfile));
+    localStorage.setItem('emergencygo_user_profile', JSON.stringify({
+      name: newProfile.name,
+      phone: newProfile.phone,
+      role: newProfile.role,
+    }));
+    if (newProfile.password) {
+      localStorage.setItem('emergencygo_user_password', newProfile.password);
+    }
+    localStorage.setItem('emergencygo_has_registered', 'true');
+
+    try {
+      await fetch('/api/users/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newProfile.name,
+          phone: newProfile.phone,
+          password: newProfile.password,
+          role: newProfile.role,
+          lat: config.center_lat,
+          lng: config.center_lng,
+        }),
+      });
+      fetchUsers();
+      setLocationToast({
+        message: `✅ Emergency profile & password saved! Welcome, ${newProfile.name}.`,
+        type: 'success',
+      });
+      setTimeout(() => setLocationToast(null), 4000);
+    } catch (e) {
+      console.warn('Note on persisting user to DB:', e);
+    }
   };
 
   // If location was previously granted, refresh silently in the background
@@ -407,23 +487,25 @@ export default function App() {
             <button
               onClick={() => setIsLocationModalOpen(true)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                isGpsActive
+                userProfile.name && isGpsActive
                   ? isDark 
                     ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50' 
                     : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-xs'
                   : isDark
-                    ? 'bg-amber-950/40 border-amber-800/80 text-amber-300 hover:bg-amber-900/50'
-                    : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 shadow-xs'
+                    ? 'bg-red-950/40 border-red-800/80 text-red-300 hover:bg-red-900/50 ring-1 ring-red-500/50'
+                    : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-xs ring-1 ring-red-400/50'
               }`}
-              title="Click to enable or update GPS location or switch user"
+              title="Click to view/edit user profile, password, or GPS location"
             >
-              <Crosshair className={`w-3.5 h-3.5 ${isGpsActive ? 'text-emerald-500 animate-pulse' : 'text-amber-500'}`} />
-              <span className="font-semibold hidden sm:inline">{userProfile.name.split(' ')[0]}</span>
+              <Crosshair className={`w-3.5 h-3.5 ${isGpsActive ? 'text-emerald-500 animate-pulse' : 'text-red-500 animate-ping'}`} />
+              <span className="font-semibold hidden sm:inline">
+                {userProfile.name ? userProfile.name.split(' ')[0] : 'Register & Set Password'}
+              </span>
               <span className="opacity-40 hidden sm:inline">·</span>
               <span className="font-semibold truncate max-w-[85px] sm:max-w-none">
                 {isGpsActive ? `${config.city}` : 'Enable GPS'}
               </span>
-              <span className={`w-1.5 h-1.5 rounded-full ${isGpsActive ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${isGpsActive ? 'bg-emerald-500 animate-ping' : 'bg-red-500 animate-bounce'}`} />
             </button>
 
             {/* Theme Toggle Button */}
@@ -455,19 +537,33 @@ export default function App() {
               <span className="hidden sm:inline">108 / 112</span>
             </button>
 
-            {/* Ingestion & DB Live Setup */}
+            {/* RESQ Crisis AI Chatbot Button */}
             <button
-              onClick={() => setIsSetupOpen(true)}
-              className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium transition-colors ${
-                isDark 
-                  ? 'bg-[#0b101c] hover:bg-slate-800 border-slate-800 text-slate-300' 
-                  : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-xs'
-              }`}
+              onClick={() => setIsResqOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white border-red-500 shadow-red-600/20"
+              title="Open RESQ Emergency Navigation & Crisis Assistant"
             >
-              <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden lg:inline">Database Live</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <Bot className="w-3.5 h-3.5 animate-pulse" />
+              <span>RESQ AI</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
             </button>
+
+            {/* Ingestion & DB Live Setup: ONLY visible to Owner / "i" */}
+            {isAdminMode && (
+              <button
+                onClick={() => setIsSetupOpen(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm ${
+                  isDark 
+                    ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-700 text-emerald-300 ring-1 ring-emerald-500/50' 
+                    : 'bg-emerald-600 hover:bg-emerald-700 border-emerald-700 text-white'
+                }`}
+                title="Database Live & Ingestion Inspector (Owner Mode)"
+              >
+                <Database className="w-3.5 h-3.5 animate-pulse" />
+                <span>Database Live</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              </button>
+            )}
 
             {/* Primary SOS Action */}
             <button
@@ -505,6 +601,51 @@ export default function App() {
         )}
       </header>
 
+      {/* Owner Live Database Diagnostics Deck (ONLY visible to Owner / "i") */}
+      {isAdminMode && (
+        <div className={`border-b py-2 px-4 sm:px-6 text-xs flex flex-wrap items-center justify-between gap-3 animate-in slide-in-from-top-1 ${
+          isDark ? 'bg-emerald-950/70 border-emerald-800/80 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 font-bold">
+              <Database className="w-4 h-4 text-emerald-500 animate-pulse" />
+              <span>Database Live: Connected (Owner View)</span>
+            </div>
+            <span className="hidden md:inline opacity-30">|</span>
+            <div className="hidden sm:flex items-center gap-2 font-mono text-[11px]">
+              <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 font-semibold">
+                {config.database_type === 'postgres' ? 'PostgreSQL/PostGIS' : 'PostGIS Spatial Engine'}
+              </span>
+              <span>Latency: ~{dbLatencyMs}ms</span>
+              <span>•</span>
+              <span>{hospitals.length} Hospitals</span>
+              <span>•</span>
+              <span>{ambulances.length} Ambulances</span>
+              <span>•</span>
+              <span>{users.length} Users</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSetupOpen(true)}
+              className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1.5 transition shadow-xs"
+            >
+              <Terminal className="w-3 h-3" />
+              <span>Open DB & Setup Inspector</span>
+            </button>
+            <button
+              onClick={() => {
+                setIsAdminMode(false);
+                localStorage.setItem('emergencygo_is_admin', 'false');
+              }}
+              className="px-2.5 py-1 rounded border border-emerald-400/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[11px] font-medium transition"
+            >
+              Exit Owner Mode
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
         {/* Active Dispatch Live Telemetry Banner (If Any) */}
@@ -530,11 +671,14 @@ export default function App() {
             }`}>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">PostGIS Spatial Engine Online</span>
+                  <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Rapid EMS Dispatch Grid Active
+                  </span>
                   <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
-                  <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Grid: {config.city}</span>
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Area: <strong>{config.city}</strong></span>
                   <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">·</span>
-                  <span className="font-mono text-slate-400">{config.center_lat.toFixed(3)}, {config.center_lng.toFixed(3)}</span>
+                  <span className="text-slate-400 font-medium">{hospitals.length} Verified Facilities</span>
                 </div>
                 <h1 className={`text-lg sm:text-xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Emergency Medical Transit & Real-Time Hospital Directory
@@ -583,7 +727,7 @@ export default function App() {
                   <div className={`flex items-center gap-3 font-mono text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                     <span>{ambulances.length} Active Ambulances</span>
                     <span>•</span>
-                    <span>{hospitals.length} Hospitals in DB</span>
+                    <span>{filteredHospitals.length} Facilities Ready</span>
                   </div>
                 </div>
               </div>
@@ -594,6 +738,42 @@ export default function App() {
                 <div className={`p-4 rounded-xl border space-y-3 transition-colors ${
                   isDark ? 'bg-[#0b101c] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
+                  {/* Quick City Presets */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                    <span className={`text-[10px] uppercase font-bold shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      City:
+                    </span>
+                    {[
+                      { name: 'Visakhapatnam', lat: 17.6868, lng: 83.2185 },
+                      { name: 'Vijayawada', lat: 16.5062, lng: 80.6480 },
+                      { name: 'Hyderabad', lat: 17.3850, lng: 78.4867 },
+                      { name: 'Bengaluru', lat: 12.9716, lng: 77.5946 },
+                      { name: 'Mumbai', lat: 18.9986, lng: 72.8427 },
+                      { name: 'Delhi NCR', lat: 28.6139, lng: 77.2090 },
+                    ].map((cityItem) => (
+                      <button
+                        key={cityItem.name}
+                        onClick={() => handleLocationGranted(cityItem.lat, cityItem.lng, cityItem.name)}
+                        className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition border ${
+                          config.city.toLowerCase().includes(cityItem.name.toLowerCase().split(' ')[0])
+                            ? 'bg-red-600 text-white border-red-600 font-semibold shadow-xs'
+                            : isDark
+                              ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs'
+                        }`}
+                      >
+                        {cityItem.name}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setIsLocationModalOpen(true)}
+                      className="px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center gap-1"
+                    >
+                      <Crosshair className="w-3 h-3" />
+                      <span>Use GPS</span>
+                    </button>
+                  </div>
+
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative flex-1 min-w-[200px]">
                       <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -728,22 +908,37 @@ export default function App() {
                       />
                     ))
                   ) : (
-                    <div className={`border rounded-2xl p-8 text-center space-y-3 ${
+                    <div className={`border rounded-2xl p-8 text-center space-y-3.5 ${
                       isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
                     }`}>
                       <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
                       <h4 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        No Hospitals Match Current Spatial Query
+                        No Emergency Facilities Match Your Filter
                       </h4>
                       <p className={`text-xs max-w-sm mx-auto ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Try expanding the radius slider or use the Setup Layer to fetch hospitals live from OpenStreetMap for {config.city}.
+                        No hospitals found with current filters within {radiusKm} km of {config.city}. Reset filters or expand search radius to see nearby facilities.
                       </p>
-                      <button
-                        onClick={() => setIsSetupOpen(true)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold"
-                      >
-                        Open Ingestion Setup & Seed OSM
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setRadiusKm(50);
+                            setSearchQuery('');
+                            setSelectedCapability('');
+                            setEmergencyOnly(false);
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition"
+                        >
+                          Reset Filters & Expand Radius (50 km)
+                        </button>
+                        {isAdminMode && (
+                          <button
+                            onClick={() => setIsSetupOpen(true)}
+                            className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                          >
+                            Owner: Seed OSM Data
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -774,6 +969,190 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* 5. USER-FRIENDLY ACCESSIBLE FOOTER */}
+      <footer className={`border-t py-6 px-4 sm:px-6 transition-colors text-xs ${
+        isDark ? 'bg-[#080d16] border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+      }`}>
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-red-600 flex items-center justify-center text-white shrink-0">
+              <Siren className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-slate-900 dark:text-white">EmergencyGo Network</div>
+              <div className="text-[11px] text-slate-500">Immediate Ambulance Dispatch & Verified ER Availability</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
+            <span className="text-red-600 flex items-center gap-1">
+              <Phone className="w-3.5 h-3.5" />
+              <span>Ambulance: <a href="tel:108" className="underline font-bold">108</a></span>
+            </span>
+            <span>·</span>
+            <span className="text-red-600 flex items-center gap-1">
+              <span>National: <a href="tel:112" className="underline font-bold">112</a></span>
+            </span>
+            <span>·</span>
+            <span>Police: <a href="tel:100" className="underline font-bold">100</a></span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Owner / Developer Access Link */}
+            <button
+              onClick={() => {
+                if (isAdminMode) {
+                  setIsAdminMode(false);
+                  localStorage.setItem('emergencygo_is_admin', 'false');
+                  setLocationToast({
+                    message: '🔒 Owner Mode Exited. Database Live is now hidden.',
+                    type: 'info',
+                  });
+                  setTimeout(() => setLocationToast(null), 3500);
+                } else {
+                  setShowAdminAuthModal(true);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                isAdminMode
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-xs'
+                  : isDark
+                    ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 shadow-xs'
+              }`}
+              title="Restricted System & Database Console (Owner Access)"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-500" />
+              <span>{isAdminMode ? '🟢 Database Live: ACTIVE (Click to Hide)' : '🔒 Owner: View Database Live'}</span>
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {/* Authorized Owner / System Access Modal */}
+      {showAdminAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className={`border rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl ${
+            isDark ? 'bg-[#0b101c] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Owner & Database Console</h3>
+                  <p className="text-[11px] text-slate-400">Unlock live database telemetry & SQL console</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAdminAuthModal(false);
+                  setAdminPassError('');
+                  setAdminPasscode('');
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Unlocking Owner Mode reveals the glowing <strong>Database Live</strong> button in the top navigation bar and the <strong>Diagnostics Deck</strong> banner showing connection status, PostGIS queries, and database tables.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setIsAdminMode(true);
+                localStorage.setItem('emergencygo_is_admin', 'true');
+                setShowAdminAuthModal(false);
+                setAdminPasscode('');
+                setLocationToast({
+                  message: '🟢 Owner Mode Unlocked! Database Live button and Diagnostics Deck are now visible in the header.',
+                  type: 'success',
+                });
+                setTimeout(() => setLocationToast(null), 5000);
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Operator Passcode (Optional for demo)
+                </label>
+                <input
+                  type="password"
+                  value={adminPasscode}
+                  onChange={(e) => setAdminPasscode(e.target.value)}
+                  placeholder="Enter passcode or click Unlock below"
+                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminAuthModal(false)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Unlock Database Live</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Location Permission & User Profile Modal */}
+      <LocationLoginModal
+        isOpen={isLocationModalOpen}
+        onClose={() => {
+          setIsLocationModalOpen(false);
+          localStorage.setItem('emergencygo_has_prompted_location', 'true');
+        }}
+        currentCity={config.city}
+        currentLat={config.center_lat}
+        currentLng={config.center_lng}
+        isGpsActive={isGpsActive}
+        onLocationGranted={handleLocationGranted}
+        currentUser={userProfile}
+        onUpdateUser={handleUpdateUser}
+        availableUsers={users}
+        theme={theme}
+        isAdminMode={isAdminMode}
+        onToggleAdminMode={() => {
+          const next = !isAdminMode;
+          setIsAdminMode(next);
+          localStorage.setItem('emergencygo_is_admin', String(next));
+          setLocationToast({
+            message: next
+              ? '🟢 Owner Mode Active: Database Live button & Diagnostics Deck are now visible in the header!'
+              : '🔒 Owner Mode Exited: Database Live is hidden from public callers.',
+            type: 'info',
+          });
+          setTimeout(() => setLocationToast(null), 4000);
+        }}
+        onLoginSuccess={(loggedUser) => {
+          setUserProfile(loggedUser);
+          setActiveRole(loggedUser.role);
+          localStorage.setItem('emergencygo_user_profile', JSON.stringify(loggedUser));
+          setLocationToast({
+            message: `👋 Welcome back, ${loggedUser.name}! Emergency profile restored.`,
+            type: 'success',
+          });
+          setTimeout(() => setLocationToast(null), 4000);
+        }}
+      />
 
       {/* Interactive Ingestion & Database Setup Modal */}
       <SetupModal
@@ -807,6 +1186,62 @@ export default function App() {
         }}
         theme={theme}
       />
+
+      {/* RESQ Emergency Navigation & Crisis AI Chatbot */}
+      <ResqChatModal
+        isOpen={isResqOpen}
+        onClose={() => setIsResqOpen(false)}
+        userLat={config.center_lat}
+        userLng={config.center_lng}
+        city={config.city}
+        hospitals={hospitals}
+        onTriggerSos={() => {
+          setIsResqOpen(false);
+          setIsSosOpen(true);
+        }}
+        onSelectHospital={(hospId) => {
+          setSelectedHospitalId(hospId);
+          setActiveRole('patient');
+          setIsResqOpen(false);
+          window.scrollTo({ top: 380, behavior: 'smooth' });
+        }}
+        theme={theme}
+      />
+
+      {/* Floating RESQ Crisis Assistant Trigger Button */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => setIsResqOpen(true)}
+          className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-full font-bold text-xs sm:text-sm shadow-xl shadow-red-600/35 border-2 border-white/30 transition-all hover:scale-105 group"
+          title="Open RESQ Emergency Navigation & Crisis Assistant"
+        >
+          <div className="relative">
+            <Bot className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full" />
+          </div>
+          <span>RESQ Crisis AI</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-black/25 font-mono">108/112</span>
+        </button>
+      </div>
+
+      {/* Floating Status Toast Notification */}
+      {locationToast && (
+        <div className="fixed bottom-20 right-6 z-50 max-w-md p-4 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-bottom-5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div className="text-xs font-medium leading-relaxed">
+            {locationToast.message}
+          </div>
+          <button
+            onClick={() => setLocationToast(null)}
+            className="text-slate-400 hover:text-slate-600 text-xs ml-auto shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

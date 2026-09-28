@@ -10,18 +10,22 @@ declare global {
 // Function to create or retrieve the connection pool.
 export const createPool = () => {
   if (!global._postgresPool) {
+    const hasHost = Boolean(process.env.SQL_HOST);
     global._postgresPool = new Pool({
-      host: process.env.SQL_HOST,
-      user: process.env.SQL_USER,
-      password: process.env.SQL_PASSWORD,
-      database: process.env.SQL_DB_NAME,
-      max: 10,
-      connectionTimeoutMillis: 15000,
+      host: process.env.SQL_HOST || '127.0.0.1',
+      user: process.env.SQL_USER || 'postgres',
+      password: process.env.SQL_PASSWORD || '',
+      database: process.env.SQL_DB_NAME || 'postgres',
+      max: hasHost ? 10 : 1,
+      connectionTimeoutMillis: hasHost ? 5000 : 500,
     });
 
     // Prevent unhandled pool-level errors from crashing the application
-    global._postgresPool.on('error', (err) => {
-      console.error('Unexpected error on idle SQL pool client:', err);
+    global._postgresPool.on('error', (err: any) => {
+      if (hasHost) {
+        console.warn('[Database Pool] Idle client note:', err.message);
+      }
+      // If no SQL_HOST was specified, suppress noise
     });
   }
   return global._postgresPool;

@@ -491,6 +491,16 @@ export const SetupModal: React.FC<SetupModalProps> = ({
                     </button>
                     <button
                       onClick={() => {
+                        setCityInput('Vijayawada');
+                        setLatInput('16.5062');
+                        setLngInput('80.6480');
+                      }}
+                      className="text-xs px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700"
+                    >
+                      Vijayawada
+                    </button>
+                    <button
+                      onClick={() => {
                         setCityInput('Hyderabad');
                         setLatInput('17.3850');
                         setLngInput('78.4867');

@@ -121,6 +121,8 @@ export interface UserAccount {
   name: string;
   email: string;
   phone: string;
+  password?: string;
+  has_password?: boolean;
   badge?: string;
   assigned_unit?: string;
   location?: { lat: number; lng: number };
