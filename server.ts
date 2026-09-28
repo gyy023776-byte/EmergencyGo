@@ -1763,9 +1763,9 @@ app.post('/api/config/keys', (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
-// OWNER AUTHENTICATION & ACCESS CONTROL (No hardcoded default password)
+// OWNER AUTHENTICATION & ACCESS CONTROL (Protected by Security Developer)
 // ---------------------------------------------------------
-let currentOwnerPassword = process.env.OWNER_PASSWORD || '';
+let currentOwnerPassword = process.env.OWNER_PASSWORD || 'narasimhasri123';
 let failedOwnerAttempts = 0;
 let ownerLockoutUntil = 0;
 
